@@ -1,0 +1,15 @@
+# Generated output — all of it is reproducible from the .scad sources:
+#   ./export_all.sh   -> stl/
+#   ./export_post.sh  -> stl_post/
+# Delete these lines if you'd rather track the STLs (e.g. to share printable
+# files with someone who doesn't have OpenSCAD installed).
+stl/
+stl_post/
+
+# Preview renders, regenerated with openscad -o renders/....png
+renders/
+
+# OpenSCAD scratch
+*.stl
+*.csg
+.DS_Store
