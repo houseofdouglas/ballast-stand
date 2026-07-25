@@ -78,14 +78,31 @@ platform_height = target_key_height - mpk_key_surface_height; // top of arms
 // ---------------------------------------------------------------------------
 // POST
 // ---------------------------------------------------------------------------
+// The post is a HOLLOW EXTRUSION-STYLE PROFILE, printed VERTICALLY (axis along
+// the printer's Z). Because the profile is prismatic, every surface is a
+// vertical wall: it needs no support and no infill -- the "infill" is replaced
+// by drawn webs, which are both calculable and faster to print than a
+// stochastic lattice. Material sits out at the walls where it earns its keep
+// rather than smeared through the middle near the neutral axis.
+//
+// Versus the old 60mm solid-ish section at 50% infill this is ~23% LESS plastic
+// and ~1.7x stiffer -- most of the stiffness coming from moving the rods from
+// +/-20 out to +/-27, which alone is worth ~1.8x on their contribution.
 post_angle   = 75;   // degrees from HORIZONTAL; leans backward, away from player
-post_size    = 60;   // square post cross-section
-rod_off      = 20;   // rods at (+/-rod_off, +/-rod_off) in the post section
+post_size    = 80;   // outer square of the hollow profile
+post_wall    = 3.5;  // outer wall thickness
+rod_off      = 27;   // rods at (+/-rod_off, +/-rod_off), in corner bosses
+boss_od      = 14;   // corner boss outer diameter (houses a rod bore)
+web_w        = 3;    // webs tying each corner boss to the two adjacent walls
 rod_d        = 8;    // steel rod nominal diameter
 rod_hole_d   = 8.6;  // bore (clearance for an epoxy film)
-boss_size    = 26;   // alignment boss between stacked post segments
+boss_size    = 26;   // alignment boss -- arms and feet only, not the post
 boss_h       = 12;
 fit_clear    = 0.3;  // per-side clearance on all plug/socket fits
+
+// Post segments have FLAT seam faces and no alignment boss: the four rods
+// through the corner bosses fully locate each segment (4 pins = no freedom
+// left), and a flat face maximises bearing area for the clamped joint.
 
 // ---------------------------------------------------------------------------
 // BALLAST HUB
@@ -96,6 +113,10 @@ hub_wall = 8; hub_floor = 8;
 shoe_plate  = 24;  // solid base plate of the shoe
 shoe_seat   = 26;  // axial distance from the shoe origin up to the post's seat
 shoe_collar = 45;  // how far the shoe's collar grips the post above that seat
+shoe_base       = 160; // shoe footprint (must fit inside the hub: hub_x-2*hub_wall)
+shoe_hull_base  = 120; // collar taper footprint; < shoe_base leaves a bolt flange
+shoe_collar_wall= 10;  // collar wall around the post socket
+shoe_bolt_off   = 68;  // hub-floor bolts, out in the exposed flange ring
 
 // ---------------------------------------------------------------------------
 // FEET  (splay is the half-angle from the rear centreline, so 45 => 90 apart)
@@ -115,7 +136,14 @@ foot_socket_depth = 80; // how far the foot root plugs into the hub boss
 // ---------------------------------------------------------------------------
 // YOKE + TRAY ARMS
 // ---------------------------------------------------------------------------
-yoke_h = 60; yoke_socket_depth = 45;
+// yoke_h/yoke_socket_depth are constrained: the tendon nuts seat in a
+// counterbore in the top, and the material BETWEEN that seat and the post
+// socket below is what carries the nut load. At yoke_h=60/socket=45 that
+// ledge was only 3.1mm. 70/40 leaves 18.5mm. See the assert below.
+yoke_h = 70; yoke_socket_depth = 40;
+tendon_cbore_d = 24;  // clears an M8 nut + penny washer
+tendon_cbore_h = 14;
+tendon_seat_min = 10; // minimum acceptable ledge under the nut
 yoke_x = 280; yoke_y = 200;  // must exceed arm_spacing + arm_w with margin
 arm_span = 550;      // total length of each lateral arm
 arm_spacing = 200;   // fore-aft distance between the two arms
@@ -133,7 +161,7 @@ max_segment_length = 200;
 // your actual prints; they only affect the reported numbers, not geometry)
 // ---------------------------------------------------------------------------
 est_arms_yoke_kg = 2.0;
-est_post_kg      = 3.0;
+est_post_kg      = 2.1;
 est_hub_feet_kg  = 4.0;
 ballast_kg       = 6.0;  // sand/bricks/plates you put in the hub
 
@@ -212,6 +240,10 @@ assert(foot_seg > foot_socket_depth + 20,
        "First foot segment is shorter than the hub socket it plugs into -- raise max_segment_length or lower foot_socket_depth.");
 assert(yoke_x >= arm_spacing + arm_w + 20,
        "Yoke plate too small for the arm spacing -- the arms would overhang its edge. Raise yoke_x.");
+assert(yoke_h/sinA - tendon_cbore_h - yoke_socket_depth >= tendon_seat_min,
+       "Too little material between the yoke's post socket and the tendon nut counterbore -- the nut would sit on a thin ledge over a cavity. Raise yoke_h, or lower yoke_socket_depth / tendon_cbore_h.");
+assert(post_size - 2*post_wall > 2*(rod_off + boss_od/2) - post_size,
+       "Corner bosses overlap the profile walls oddly -- check post_size / rod_off / boss_od.");
 
 echo("=== MPK249 SINGLE-POST STAND ===");
 echo(str("keyboard rest surface (top of arms) = ", platform_height, " mm"));
@@ -250,18 +282,40 @@ module post_rod_holes(len, extra=2) {
 }
 
 // ---------------------------------------------------------------------------
-// post_segment: stacked square section, 4 rod bores, alignment boss on top /
-// matching socket underneath. Printed LYING DOWN (long axis horizontal).
+// post_segment: hollow extrusion-style profile, printed standing up.
 // ---------------------------------------------------------------------------
-module post_segment(len) {
+// 2D profile -- the "extrusion die". Square tube + four corner bosses carrying
+// the rod bores + short webs tying each boss to its two adjacent walls.
+module post_profile() {
+  inner = post_size/2 - post_wall;
   difference() {
     union() {
-      box_xyc(post_size, post_size, len, 0);
-      box_xyc(boss_size, boss_size, boss_h, len);
+      difference() {
+        square([post_size, post_size], center=true);
+        square([post_size-2*post_wall, post_size-2*post_wall], center=true);
+      }
+      for (sx=[-1,1], sy=[-1,1]) {
+        translate([sx*rod_off, sy*rod_off]) circle(d=boss_od, $fn=32);
+        // Webs are drawn out to the OUTER face rather than stopping flush on
+        // the inner one. Geometrically identical (the wall already fills that
+        // band, and both forms verify as "Simple: yes" with the same 544
+        // vertices), but it avoids relying on an exact-tangency union, which
+        // is the kind of thing that bites when someone edits post_wall later.
+        translate([sx*(rod_off + post_size/2)/2, sy*rod_off])
+          square([post_size/2 - rod_off, web_w], center=true);
+        translate([sx*rod_off, sy*(rod_off + post_size/2)/2])
+          square([web_w, post_size/2 - rod_off], center=true);
+      }
     }
-    box_xyc(boss_size+2*fit_clear, boss_size+2*fit_clear, boss_h+0.5, -0.25);
-    post_rod_holes(len + boss_h);
+    for (sx=[-1,1], sy=[-1,1])
+      translate([sx*rod_off, sy*rod_off]) circle(d=rod_hole_d, $fn=32);
   }
+}
+
+// Print this STANDING UP (segment axis vertical). Prismatic => zero support,
+// zero infill, and the flat end faces come out square for good seam bearing.
+module post_segment(len) {
+  linear_extrude(len) post_profile();
 }
 
 // ---------------------------------------------------------------------------
@@ -272,16 +326,20 @@ module post_segment(len) {
 // four hub quadrant seams and helps tie them together.
 // ---------------------------------------------------------------------------
 module post_shoe() {
-  base = 130;
+  base       = shoe_base;
+  hull_base  = shoe_hull_base;
   difference() {
     union() {
       box_xyc(base, base, shoe_plate, 0);
-      // collar tapering up from the plate to grip the post
+      // collar tapering up from the plate to grip the post. hull_base is kept
+      // smaller than the plate so a flange ring stays EXPOSED around the
+      // outside for the hub-floor bolts -- otherwise the taper buries their
+      // heads and they can't be reached.
       hull() {
-        box_xyc(base, base, 0.01, shoe_plate-0.01);
+        box_xyc(hull_base, hull_base, 0.01, shoe_plate-0.01);
         rotate([0,-(90-post_angle),0])
           translate([0,0,shoe_seat+shoe_collar])
-            box_xyc(post_size+2*hub_wall, post_size+2*hub_wall, 0.01);
+            box_xyc(post_size+2*shoe_collar_wall, post_size+2*shoe_collar_wall, 0.01);
       }
     }
     rotate([0,-(90-post_angle),0]) {
@@ -289,13 +347,23 @@ module post_shoe() {
       // post to bear on (the seat is square to the post axis, as the post's
       // own cut end is)
       translate([0,0,shoe_seat])
-        box_xyc(post_size+2*fit_clear, post_size+2*fit_clear, shoe_collar+60);
-      // rod bores continue on through the plate into the hub floor
-      translate([0,0,-60]) post_rod_holes(shoe_collar+200);
+        box_xyc(post_size+2*fit_clear, post_size+2*fit_clear, shoe_collar+80);
+      // rod bores run right through
+      translate([0,0,-60]) post_rod_holes(shoe_collar+220);
+      // NOTE: the tendons are anchored here by BONDED length, not by nuts.
+      // Nut pockets were the obvious idea but don't work at the bottom: the
+      // rods are tilted while the shoe's underside is horizontal, so four
+      // coaxial pockets end up at four different depths (a ~14mm spread at
+      // +/-27 offset) -- two would break out through the bottom face while
+      // two stayed buried. Bonded anchorage avoids the problem entirely and
+      // is loaded in SHEAR along the rod (~0.4 MPa over the embedded length),
+      // which is a reliable use of epoxy, unlike pulling a printed seam apart.
+      // All tensioning is done at the yoke end.
     }
-    // hub-floor bolt holes, one per quadrant
+    // hub-floor bolt holes, out in the exposed flange ring
     for (sx=[-1,1], sy=[-1,1])
-      translate([sx*45, sy*45, -1]) cylinder(d=6.5, h=shoe_plate+2, $fn=24);
+      translate([sx*shoe_bolt_off, sy*shoe_bolt_off, -1])
+        cylinder(d=6.5, h=shoe_plate+2, $fn=24);
   }
 }
 
@@ -315,7 +383,13 @@ module post_yoke() {
     // socket swallowing the top of the post, plus rod bores running up into it
     rotate([0,-(90-post_angle),0]) {
       translate([0,0,-1]) box_xyc(post_size+2*fit_clear, post_size+2*fit_clear, yoke_socket_depth+1);
-      translate([0,0,-1]) post_rod_holes(yoke_h+20);
+      translate([0,0,-1]) post_rod_holes(yoke_h+40);
+      // Counterbores for the tendon nuts + washers. Coaxial with the rods so
+      // the washer seats square to the rod, not skewed against the horizontal
+      // top face. This is the end you actually tension from.
+      for (sx=[-1,1], sy=[-1,1])
+        translate([sx*rod_off, sy*rod_off, yoke_h/sinA - tendon_cbore_h])
+          cylinder(d=tendon_cbore_d, h=tendon_cbore_h+20, $fn=32);
     }
     // bolt holes for the two arms (2 bolts per arm)
     for (sx=[-1,1], sy=[-1,1])

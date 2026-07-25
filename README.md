@@ -13,7 +13,7 @@ There are **two independent designs** here — pick one:
 | Shape | table-like box frame | inclined column on a ballasted base |
 | Printed parts | ~36 | ~24 |
 | Knee clearance | legs at the keyboard's corners | open — post leans away from you |
-| Tip resistance (sideways) | ~3 kgf | ~11.4 kgf ballasted / ~6.4 kgf not |
+| Tip resistance (sideways) | ~3 kgf | ~10.9 kgf ballasted / ~5.9 kgf not |
 | Needs a wall strap? | yes, strongly recommended | no, if you ballast the hub |
 
 **Design B is the better stand**, somewhat counter-intuitively. A single post
@@ -227,8 +227,9 @@ An inclined column on a ballasted base. This is the design I'd build.
   Each plugs 80mm into a closed sleeve on the hub and is pinned with two M6
   cross bolts. (Splay is adjustable — see the table below.)
 - **Post** — 75° from horizontal, leaning backward, printed as 3 stacked
-  square segments (60 x 60mm) over **4 continuous 8mm steel rods** that run
-  unbroken from the base shoe all the way into the yoke.
+  **hollow extrusion-profile** segments (80 x 80mm, 3.5mm wall, four corner
+  bosses) over **4 continuous 8mm steel rods** that run unbroken from the base
+  shoe all the way into the yoke. See [the post profile](#the-post-profile).
 - **Yoke** — a wedge block at the top that converts the 75° post to a
   horizontal mounting plate.
 - **Tray arms** — two lateral arms (550mm each, 200mm apart) rather than a
@@ -253,6 +254,72 @@ slowly and permanently under a load held for months. Four 8mm rods carry
 that moment; the plastic provides shape, spacing and shear transfer. **The
 rods are not optional in this design.**
 
+## The post profile
+
+The post is a hollow extrusion-style section rather than a solid block:
+
+```
+  ┌─────────────────────┐    80 x 80mm, 3.5mm wall
+  │ ◎               ◎   │    ◎ = corner boss, 8.6mm bore, at +/-27
+  │  ╲             ╱    │    short webs tie each boss to both walls
+  │                     │
+  │  ╱             ╲    │    open centre - nothing to fill
+  │ ◎               ◎   │
+  └─────────────────────┘
+```
+
+**Print it standing up, 0% infill, no support.** Because the profile is
+prismatic, every surface is a vertical wall — there is nothing to overhang and
+nothing to fill. The webs replace infill with geometry you can actually
+calculate, and walls extrude continuously where infill is constant direction
+changes and travel moves.
+
+Against the previous 60mm solid-ish section at 50% infill:
+
+| | 60sq @50% infill | 80sq hollow | change |
+|---|---|---|---|
+| plastic (post only) | 1494 g | 1146 g | **−23%** |
+| bending stiffness EI | 1.82e10 | 3.16e10 | **1.7x** |
+| stiffness per kg | 1.2e7 | 2.8e7 | **2.3x** |
+
+Most of the stiffness gain isn't the hollow section itself — it's that the
+rods moved from ±20 to ±27, which alone is worth ~1.8x on their contribution.
+Infill sits near the neutral axis, where material contributes almost nothing
+to bending; the point of the profile is to get material (and the rods) out to
+the edges where it earns its keep.
+
+## Compression at the seams (optional)
+
+The four rods can be run as **post-tensioning tendons** rather than just being
+epoxied: thread the ends, and the nuts in the yoke's counterbores squeeze every
+seam permanently closed so the joints never see tension at all.
+
+The preload needed is small. For a 60 N·m design moment this section needs
+~2.9 kN total, ~723 N per rod, which is about **1.2 N·m of torque** — barely
+more than finger-tight — and puts only 1.27 MPa on the seam. The deeper hollow
+section actually needs *53% less* preload than the old solid one, because
+section modulus grows faster than bearing area.
+
+Two things worth knowing before you bother:
+
+- **It buys robustness, not strength.** At 60 N·m the steel carries 91% of the
+  bending and the plastic sees ~0.11 MPa of tension — a ~226x margin against
+  PETG's layer-adhesion strength. The layer bonds were never close to failing.
+  What you gain is a **demountable column** (loosen four nuts and it packs
+  flat) and no dependence on epoxy in tension.
+- **Creep will eat the preload if you use plain nuts.** The rods are so stiff
+  axially that **0.1mm of creep shortening loses ~1687 N per rod** — more than
+  the whole preload. Either use disc-spring (Belleville) stacks under the nuts,
+  or re-torque after a week, a month, then annually. Wire rope would dodge this
+  entirely (~26x more compliant) but can't carry bending, so it can't replace
+  the rods here.
+
+The bottom ends are anchored by **bonded length in the shoe**, not nuts —
+because the rods tilt while the shoe's underside is horizontal, four coaxial
+nut pockets would end up at four different depths. Epoxy loaded in shear along
+a steel rod is reliable (~0.4 MPa here); that's a completely different demand
+from pulling a printed seam apart. All tensioning happens at the yoke end.
+
 ## Stability numbers
 
 Computed by the model itself — run `openscad --export-format=echo -o - single_post_stand.scad`
@@ -261,8 +328,8 @@ needed at keyboard height to tip the stand:
 
 | | forward (toward you) | backward | sideways |
 |---|---|---|---|
-| **Ballasted, 6kg in hub** | 9.4 kgf | 15.7 kgf | 11.4 kgf |
-| **Unballasted** | 5.8 kgf | 7.5 kgf | 6.4 kgf |
+| **Ballasted, 6kg in hub** | 8.9 kgf | 15.1 kgf | 10.9 kgf |
+| **Unballasted** | 5.3 kgf | 6.9 kgf | 5.9 kgf |
 
 For comparison, Design A manages about 3 kgf. Even unballasted this is the
 more stable stand; ballasted it's comfortably solid.
@@ -304,7 +371,7 @@ back with `hub_cx` and re-read the echoed numbers before you commit.
 
 | Part | STL | Qty | Notes |
 |---|---|---|---|
-| Post segment | `post_segment.stl` | 3 | ~199mm each, 4 rod bores |
+| Post segment | `post_segment.stl` | 3 | ~193mm each, hollow profile, print standing up |
 | Post shoe | `post_shoe.stl` | 1 | angled seat, bolts to hub floor |
 | Post yoke | `post_yoke.stl` | 1 | 75° → horizontal wedge |
 | Arm centre | `arm_center.stl` | 2 | 200mm, bolts to yoke |
@@ -347,9 +414,14 @@ perimeters.
 
 Orientation notes specific to this design:
 
-- **Post segments, arms, feet**: print lying down, long axis horizontal. This
-  puts strong in-layer plastic along the beam's length, where the bending
-  load is, instead of relying on layer adhesion.
+- **Post segments**: print **standing up** (axis vertical), **no infill, no
+  support**. The profile is prismatic, so every surface is a vertical wall —
+  the slicer just traces the outline. Set infill to 0%; the webs *are* the
+  infill. This is the opposite of the advice for the other beams, and it's
+  only safe because the rods take the bending (see below).
+- **Arms and feet**: print lying down, long axis horizontal. These are solid
+  beams, so this puts strong in-layer plastic along the length where the
+  bending load is, instead of relying on layer adhesion.
 - **Post yoke**: print **upside down**, flat top face on the bed. Then the
   angled socket and rod bores are only 15° off vertical and need no support.
 - **Post shoe**: flat base on the bed, right way up — the socket is again 15°
