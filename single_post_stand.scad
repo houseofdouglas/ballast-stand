@@ -403,26 +403,21 @@ module post_yoke() {
 // separated so they actually resist bending (a single rod on the neutral
 // axis would add almost nothing). `center=true` adds the yoke bolt holes.
 // Printed lying down.
+//
+// NO alignment boss: two parallel rods already fully constrain the joint
+// (nothing can rotate or shift), and flat faces give maximum glue area. An
+// earlier version had an 18.2mm boss here, but the rod bores at +/-10 span
+// +/-5.7..14.3 and cut 3.4mm into it from both sides -- the boss came out
+// hacked into a cross and the rods could not pass through the joint cleanly.
+// The same reasoning is why the post segments butt flat too.
 // ---------------------------------------------------------------------------
-// `center=true`  -> the middle segment: bolts down to the yoke, and carries an
-//                   alignment boss on BOTH ends for the wings to plug into.
-// `center=false` -> a wing: plain socket at its inner (-Y) end, plain outer end.
 module arm_segment(len, center=false) {
-  ab = boss_size*0.7;
   difference() {
-    union() {
-      cbox(arm_w, len, arm_h);
-      if (center)
-        for (sy=[-1,1])
-          translate([0, sy*(len/2 + boss_h/2), 0]) cbox(ab, boss_h, ab);
-    }
-    if (!center)
-      translate([0, -len/2 + boss_h/2, 0])
-        cbox(ab+2*fit_clear, boss_h+0.5, ab+2*fit_clear);
+    cbox(arm_w, len, arm_h);
     // two rods, vertically separated so they actually resist bending
     for (z = arm_rod_z)
-      translate([0, -len/2-boss_h-1, z-arm_h/2])
-        rotate([-90,0,0]) cylinder(d=rod_hole_d, h=len+2*boss_h+2, $fn=24);
+      translate([0, -len/2-1, z-arm_h/2])
+        rotate([-90,0,0]) cylinder(d=rod_hole_d, h=len+2, $fn=24);
     if (center)
       for (sy=[-1,1])
         translate([0, sy*70, -arm_h/2-1]) cylinder(d=5.5, h=arm_h+2, $fn=24);
@@ -432,21 +427,16 @@ module arm_segment(len, center=false) {
 // ---------------------------------------------------------------------------
 // foot_segment / foot_tip: splayed rear feet. Two rods vertically separated.
 // ---------------------------------------------------------------------------
-// `root=true` -> the segment that plugs into the hub's foot socket: its inner
-// end is left plain (it IS the plug) and it carries the cross-bolt holes.
+// `root=true` -> the segment that plugs into the hub's foot socket: it carries
+// the cross-bolt holes that pin it into the sleeve.
+// Butt-jointed on the rods, same as the arms -- the old 20.8mm boss cleared
+// the rod bores by only 0.3mm, which is a sliver that would not print.
 module foot_segment(len, root=false) {
-  fb = boss_size*0.8;
   difference() {
-    union() {
-      box_xyc(foot_w, len, foot_h, 0);
-      translate([0, len/2 + boss_h/2, foot_h/2]) cbox(fb, boss_h, fb);
-    }
-    if (!root)
-      translate([0, -len/2 + boss_h/2, foot_h/2])
-        cbox(fb+2*fit_clear, boss_h+0.5, fb+2*fit_clear);
+    box_xyc(foot_w, len, foot_h, 0);
     for (z = foot_rod_z)
       translate([0, -len/2-1, z]) rotate([-90,0,0])
-        cylinder(d=rod_hole_d, h=len+boss_h+2, $fn=24);
+        cylinder(d=rod_hole_d, h=len+2, $fn=24);
     // cross bolts that pin the root into the hub boss (clear of both rods)
     if (root)
       for (y = [-len/2+25, -len/2+60])
@@ -455,18 +445,26 @@ module foot_segment(len, root=false) {
   }
 }
 
+// The tip keeps a FULL-HEIGHT section for its first `flat` mm before tapering.
+// A taper running the whole length would drop below the upper rod bore about
+// a third of the way along, leaving that rod sitting in an open groove on the
+// top surface instead of a closed hole.
 module foot_tip() {
   len = 60;
-  fb = boss_size*0.8;
+  flat = 26;           // full-height length housing the rod bores
+  y0 = -len/2;
+  yf = y0 + flat;
   difference() {
-    hull() {
-      translate([0,-len/2,0]) box_xyc(foot_w, 0.01, foot_h);
-      translate([0, len/2,0]) box_xyc(foot_w, 0.01, foot_h*0.55);
+    union() {
+      translate([0, (y0+yf)/2, 0]) box_xyc(foot_w, flat, foot_h, 0);
+      hull() {
+        translate([0, yf, 0]) box_xyc(foot_w, 0.01, foot_h, 0);
+        translate([0, len/2, 0]) box_xyc(foot_w, 0.01, foot_h*0.55, 0);
+      }
     }
-    translate([0, -len/2 + boss_h/2, foot_h/2])
-      cbox(fb+2*fit_clear, boss_h+0.5, fb+2*fit_clear);
     for (z = foot_rod_z)
-      translate([0, -len/2-1, z]) rotate([-90,0,0]) cylinder(d=rod_hole_d, h=len*0.7, $fn=24);
+      translate([0, y0-1, z]) rotate([-90,0,0])
+        cylinder(d=rod_hole_d, h=flat-2, $fn=24);
     // recess for a stick-on felt/rubber pad
     translate([0,0,-0.5]) box_xyc(foot_w-12, len-14, 1.5);
   }
@@ -570,9 +568,10 @@ module assembly() {
   for (sx=[-1,1])
     translate([kb_cx + sx*arm_spacing/2, 0, platform_height - arm_h/2]) {
       arm_segment(arm_center_len, true);
+      // wings are symmetric now (plain butt ends), so no flip needed
       for (sy=[-1,1])
         translate([0, sy*(arm_center_len/2 + arm_wing_seg/2), 0])
-          rotate([0,0,sy>0?0:180]) arm_segment(arm_wing_seg);
+          arm_segment(arm_wing_seg);
     }
   // keyboard silhouette (not printed)
   %translate([kb_cx - mpk_depth/2, -mpk_width/2, platform_height])

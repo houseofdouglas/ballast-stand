@@ -233,7 +233,7 @@ An inclined column on a ballasted base. This is the design I'd build.
 - **Yoke** — a wedge block at the top that converts the 75° post to a
   horizontal mounting plate.
 - **Tray arms** — two lateral arms (550mm each, 200mm apart) rather than a
-  solid tray. Two arms carry the keyboard perfectly well and print far more
+  solid tray, each on 2 rods. Two arms carry the keyboard perfectly well and print far more
   easily than a solid 550 x 260mm slab, which wouldn't fit most beds.
 
 ## Why ballast, and why the post is rod-reinforced
@@ -313,6 +313,20 @@ Two things worth knowing before you bother:
   or re-torque after a week, a month, then annually. Wire rope would dodge this
   entirely (~26x more compliant) but can't carry bending, so it can't replace
   the rods here.
+
+### Why nothing has alignment bosses
+
+Every segmented member here — post, arms, feet — butts together on **flat
+faces** with no spigot/socket. That's deliberate: two or more parallel rods
+already remove every degree of freedom at the joint, so a boss adds nothing
+but does eat bearing and glue area.
+
+It also avoids a trap. The arms originally had an 18.2mm boss, but their rod
+bores sit at ±10 and span ±5.7–14.3, so the bores cut 3.4mm into the boss
+from both sides — it came out hacked into a cross shape and the rods couldn't
+pass through the joint. The feet had the same collision with only 0.3mm of
+clearance, a sliver that would never have printed. If you re-introduce a boss,
+check it clears `rod_hole_d/2` beyond every rod centre.
 
 The bottom ends are anchored by **bonded length in the shoe**, not nuts —
 because the rods tilt while the shoe's underside is horizontal, four coaxial
